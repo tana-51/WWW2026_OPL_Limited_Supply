@@ -1,3 +1,7 @@
+"""
+各stepで、どのアイテムを推薦しているかをヒートマップで描画
+"""
+
 import numpy as np
 import os
 import matplotlib.pyplot as plt
