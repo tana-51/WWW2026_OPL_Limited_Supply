@@ -1,7 +1,8 @@
 """
 各stepで、どのアイテムを推薦しているかをヒートマップで描画
 """
-
+from omegaconf import DictConfig, OmegaConf
+import hydra
 import numpy as np
 import os
 import matplotlib.pyplot as plt
@@ -15,11 +16,11 @@ from sklearn.neural_network import MLPRegressor
 import obp
 from obp.utils import sigmoid
 from obp.dataset import(
-    SyntheticBanditDataset,
     linear_reward_function,
     linear_behavior_policy,
 )
-#from dataset import SyntheticBanditDataset
+from dataset import obtain_supply
+from dataset import SyntheticBanditDatasetLimittedSupply
 
 from obp.ope import(
     OffPolicyEvaluation,
@@ -34,13 +35,13 @@ from agent.agent import(
     NewAgent,
 ) 
 
-def plot_heat(step_idx_list, item_for_user, name):
+def plot_heat(step_idx_list, item_for_user, name, n_users, n_action):
+
     supply_ratio_list = []
     for step_idx in step_idx_list:
         df_list = []
         supply_ratio_list.append(item_for_user[:,:,step_idx].sum(axis=0))
-        # step_idx = 20
-        # print(item_for_user[:,:,50].sum(axis=0))
+        
         for i in range(n_action):
             df = DataFrame()
             df["user_idx"] = np.arange(n_users)
@@ -51,6 +52,7 @@ def plot_heat(step_idx_list, item_for_user, name):
         df = pd.concat(df_list, axis=0)
         df = pd.pivot_table(data=df, values='value', columns='item_idx', index='user_idx', aggfunc="sum")
         fontsize = 20
+        plt.style.use('ggplot')
         plt.figure(figsize=(12, 9))
         sns.heatmap(df, annot=True, fmt='g', cmap='Blues')
         plt.title(f"timestep = {step_idx}",fontsize=fontsize)
@@ -58,9 +60,10 @@ def plot_heat(step_idx_list, item_for_user, name):
         plt.ylabel("user index",fontsize=fontsize)
         plt.xticks(fontsize=fontsize)
         plt.yticks(fontsize=fontsize)
-        plt.savefig(f"output2/{name}/heatmap_{step_idx}.png")
-        plt.show()
+        plt.savefig(f"{name}/heatmap_{step_idx}.png")
+        plt.close()
         
+        plt.style.use('ggplot')
         plt.figure(figsize=(12, 9))
         plt.bar(np.arange(n_action),item_for_user[:,:,step_idx].sum(axis=0))
         plt.title(f"timestep = {step_idx}",fontsize=fontsize)
@@ -69,52 +72,41 @@ def plot_heat(step_idx_list, item_for_user, name):
         plt.ylim(0.0,1.1)
         plt.xticks(np.arange(n_action),fontsize=fontsize)
         plt.yticks(fontsize=fontsize)
-        plt.savefig(f"output2/{name}/recommended_ratio_step{step_idx}.png")
-        plt.show()
+        plt.savefig(f"{name}/recommended_ratio_step{step_idx}.png")
+        plt.close()
 
 
 
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
-os.makedirs("output2",exist_ok=True)
-os.makedirs("output2/previous",exist_ok=True)
-os.makedirs("output2/new",exist_ok=True)
+@hydra.main(config_path="../conf",config_name="config", version_base="1.1")
+def main(cfg: DictConfig) -> None:
+    os.makedirs("previous", exist_ok=True)
+    os.makedirs("new", exist_ok=True)   
+    np.random.seed(cfg.setting.random_state)
 
-np.random.seed(0)
+    num_runs = cfg.setting.num_runs
+    n_step = cfg.setting.heatmap.n_step
 
-num_runs = 1000
-n_step = 100
+    n_users = cfg.setting.heatmap.n_users
+    n_action = cfg.setting.heatmap.n_action
+    lambda_ = cfg.setting.heatmap.lambda_
+    supply_type = cfg.setting.heatmap.supply_type
 
-n_users = 5
-fixed_user_context = np.random.normal(loc=0, scale=3.0, size=(n_users, 10))
+    result_list = []
+    regret_list = []
 
-
-n_action = 10
-action_context = np.eye(n_action, dtype=int)
-
-
-fixed_q_x_a_base = linear_reward_function(
-                context=fixed_user_context,
-                action_context=action_context,
-                random_state=0,
-            ) 
-
-
-fixed_q_x_a_base = np.abs(fixed_q_x_a_base) 
-fixed_increace = np.sort(np.random.uniform(low=0.0, high=fixed_q_x_a_base.max(), size=(n_users, n_action)), axis=1)
-# fixed_increace += np.sort(np.random.uniform(low=0.0, high=fixed_q_x_a.max(), size=(n_users, n_action)), axis=0)/2
-result_list = []
-regret_list = []
-
-# lambda_array = np.array([i for i in range(0,11,2)])/10
-lambda_array = np.array([0])
-for lambda_ in lambda_array:
-    fixed_q_x_a = lambda_*fixed_q_x_a_base + (1-lambda_)*fixed_increace
-    
-    # print("fixed_q_x_a",fixed_q_x_a)
-    # print("max_user",np.argmax(fixed_q_x_a, axis=0))
-    df_q_x_a = pd.DataFrame(data=fixed_q_x_a)
-    df_q_x_a.to_csv("output2/q_x_a.csv")
-    
+    dataset = SyntheticBanditDatasetLimittedSupply(
+                n_actions=n_action,
+                dim_context=cfg.setting.dim_context,
+                reward_std=cfg.setting.reward_std,
+                beta=cfg.setting.beta,
+                random_state=cfg.setting.random_state,
+                n_users=n_users,
+                lambda_=lambda_, #小さいほど好みが揃う
+                n_step=n_step,
+                max_supply=cfg.setting.max_supply,
+                supply_type=supply_type,
+            )
+    fixed_q_x_a, fixed_click, fixed_conversion = dataset.obtain_q_x_a()
     
     previous = np.zeros(n_step)
     new = np.zeros(n_step)
@@ -128,8 +120,13 @@ for lambda_ in lambda_array:
         item_for_user_previous = np.zeros((n_users, n_action, n_step))
         item_for_user_new = np.zeros((n_users, n_action, n_step))
         
-        # supply_previous = np.array([5]*n_action)
-        supply_previous = np.random.randint(low=1, high=10, size=n_action)
+
+        supply_previous = obtain_supply(
+                    n_action=n_action,
+                    fixed_q_x_a=fixed_q_x_a,
+                    max_supply=cfg.setting.max_supply,
+                    supply_type=supply_type,
+                )
         supply_first = supply_previous.copy()
         supply_new = supply_previous.copy()
         x = supply_previous.copy()
@@ -159,9 +156,9 @@ for lambda_ in lambda_array:
                 r_previous = 0
                 item_for_user_previous[:,:,i] = item_for_user_previous[:,:,i-1].copy()
             else:
-                click_previous = 1 #np.random.binomial(n=1, p=click_prob[user_idx, arm_previous])
+                click_previous = np.random.binomial(n=1, p=fixed_click[user_idx, arm_previous])
                 n_select_arm_previous[arm_previous] += 1*click_previous
-                r_previous = np.random.normal(loc=fixed_q_x_a[user_idx, arm_previous], scale=3.0)*click_previous
+                r_previous = np.random.normal(loc=fixed_conversion[user_idx, arm_previous], scale=cfg.setting.reward_std)*click_previous
                 arm_reward_previous[arm_previous] += r_previous
                 if i==0:
                     item_for_user_previous[user_idx,arm_previous,i] += 1/(supply_first[arm_previous]*num_runs)
@@ -179,9 +176,9 @@ for lambda_ in lambda_array:
                 r_new = 0
                 item_for_user_new[:,:,i] = item_for_user_new[:,:,i-1].copy()
             else:
-                click_new = 1 #np.random.binomial(n=1, p=click_prob[user_idx, arm_new])
+                click_new = np.random.binomial(n=1, p=fixed_click[user_idx, arm_new])
                 n_select_arm_new[arm_new] += 1*click_new
-                r_new = np.random.normal(loc=fixed_q_x_a[user_idx, arm_new], scale=3.0)*click_new
+                r_new = np.random.normal(loc=fixed_conversion[user_idx, arm_new], scale=cfg.setting.reward_std)*click_new
                 arm_reward_new[arm_new] += r_new
                 if i ==0: 
                     item_for_user_new[user_idx,arm_new,i] += 1/(supply_first[arm_new]*num_runs)
@@ -204,30 +201,26 @@ for lambda_ in lambda_array:
         item_for_user_new_ += item_for_user_new
     result_list.append((new/num_runs)/(previous/num_runs))
     regret_list.append([previous_regret/num_runs,new_regret/num_runs])
-    plt.plot((new/num_runs)/(previous/num_runs), label=f"$\lambda$={lambda_}")
+
+    plt.style.use('ggplot')
+    fig = plt.figure(figsize=(7,7),tight_layout=True)
+    ax = fig.add_subplot(1,1,1)
+    ax.plot((new/num_runs)/(previous/num_runs), label=f"$\lambda$={lambda_}")
     # plt.plot(new/num_runs, label="regret_based")
-plt.legend()
+    ax.legend()
 
-plt.xlabel("Time Step",fontsize=12)
-plt.ylabel("Relative Reward (Ours/previous)",fontsize=12)
-plt.title(f"n_users = {n_users}, n_actions = {n_action}")
-plt.hlines(1.0, 0, n_step, color="black", linestyles='dashed')
-plt.savefig("output2/val_lambda.png")
-plt.show()
+    ax.set_xlabel("Time Step",fontsize=12)
+    ax.set_ylabel("Relative Reward (Ours/previous)",fontsize=12)
+    # plt.title(f"n_users = {n_users}, n_actions = {n_action}")
+    plt.title(f"Supply Type: {supply_type}")
+    ax.axhline(1.0, 0, n_step, color="black", linestyle='dashed')
+    plt.savefig(f"val_lambda_{supply_type}.png")
+    plt.close()
 
-# #lambda-relative reward
-# last_value = []
-# for i, lambda_ in enumerate(lambda_array):
-#     last_value.append(result_list[i][-1])
-    
-# plt.plot(lambda_array, last_value, "-o")
-# plt.xlabel("$\lambda$",fontsize=12)
-# plt.ylabel("Relative Reward (Ours/previous)",fontsize=12)
-# plt.title(f"n_users = {n_users}, n_actions = {n_action}")
-# # plt.savefig("output2/lambda_vs_lastvalue.png")
-# plt.show()
+    step_idx_list = np.array([5,10,20,30,40,50,60,70,80,90,100,110])
 
-step_idx_list = [5,10,20,30,40,50,60,70]
+    plot_heat(step_idx_list, item_for_user_previous_, "previous", n_users, n_action)
+    plot_heat(step_idx_list, item_for_user_new_, "new", n_users, n_action)
 
-plot_heat(step_idx_list, item_for_user_previous_, "previous")
-plot_heat(step_idx_list, item_for_user_new_, "new")
+if __name__ == "__main__":
+    main()

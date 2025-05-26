@@ -1,0 +1,8 @@
+defaults:
+  - setting: default
+hydra:
+  run:
+    dir: ./synthetic /${setting.run_file}/n_users=${setting.n_users},n_action=${setting.n_action}
+  sweep:
+    dir: ./synthetic /${setting.run_file}/n_users=${setting.n_users},n_action=${setting.n_action}
+    subdir: ./

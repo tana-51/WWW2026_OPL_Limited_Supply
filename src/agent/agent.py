@@ -22,7 +22,7 @@ class NewAgent():
         
     def select_arm(self, user_idx, fixed_q_x_a, supply,):
 
-        regret = self.regret#*supply
+        regret = self.regret.copy()
         regret[:,supply<1] = 1000000
         #regret /= supply
         min_regret_idx = np.where(regret[user_idx]==np.min(regret[user_idx]))
