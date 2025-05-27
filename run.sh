@@ -8,4 +8,11 @@
 # python ./src/main_supply_item.py setting.run_file="main_supply_item" 
 
 #user_action_ratio
-python ./src/main_user_action_ratio.py setting.run_file="main_user_action_ratio" 
+# python ./src/main_user_action_ratio.py setting.run_file="main_user_action_ratio" 
+
+#noise
+# python ./src/main_estimation_noise.py setting.run_file="main_estimation_noise" 
+
+#step
+# python ./src/main_step.py setting.run_file="main_step" 
+python ./src/main_step.py setting.run_file="main_step_NewAgenStep" 

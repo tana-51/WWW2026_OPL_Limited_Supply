@@ -207,11 +207,11 @@ def main(cfg: DictConfig) -> None:
 
     for i, supply_type in enumerate(supply_type_list):
         last_value = df[supply_type]
-        ax.plot(n_users_list, last_value, "-o", label=supply_type)
+        ax.plot(np.array(n_users_list)/n_action, last_value, "-o", label=supply_type)
     ax.set_xlabel("$user / action ratio$",fontsize=12)
     ax.set_ylabel("Relative Reward (Ours/previous)",fontsize=12)
     ax.legend(fontsize=15)
-    plt.title(f"n_users = {n_users}, n_actions = {n_action}")
+    # plt.title(f"n_users = {n_users}, n_actions = {n_action}")
     plt.savefig("user_action_rartio_vs_lastvalue.png")
     plt.show()
 
