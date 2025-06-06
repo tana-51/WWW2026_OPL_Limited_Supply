@@ -5,7 +5,9 @@ class PreviousAgent():
         self.q_max = fixed_q_x_a.max(axis=0) #user間で最も高いq(x,a)の値
         
     def select_arm(self, user_idx, fixed_q_x_a, supply):
-        fixed_q_x_a_ = fixed_q_x_a*(supply>=1)
+        # fixed_q_x_a_ = fixed_q_x_a*(supply>=1)
+        fixed_q_x_a_ = fixed_q_x_a.copy()
+        fixed_q_x_a_[:,supply<1] = -np.inf
         regret_value = self.q_max[np.argmax(fixed_q_x_a_[user_idx])] - fixed_q_x_a[user_idx,np.argmax(fixed_q_x_a_[user_idx])]
         if (supply>=1).sum()==0:
             regret_value = 0

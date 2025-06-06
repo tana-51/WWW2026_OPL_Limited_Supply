@@ -166,6 +166,9 @@ def main(cfg: DictConfig) -> None:
                     supply_new[arm_new] -= click_new
                     regret_sum_list_new.append(regret_sum_list_new[i-1]+regret_value_new)
                 
+                
+                if ((supply_new>0).sum() >= 1) or ((supply_previous>0).sum() >= 1):
+                    raise ValueError(f"supply must be above 0, but got supply_new={supply_new} and supply_previous={supply_previous}")
                 # arm_reward_previous /= n_select_arm_previous
                 # arm_reward_new /= n_select_arm_new
 

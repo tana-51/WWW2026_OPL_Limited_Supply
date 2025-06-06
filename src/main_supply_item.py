@@ -90,8 +90,8 @@ def main(cfg: DictConfig) -> None:
 
             fixed_q_x_a, fixed_click, fixed_conversion = dataset.obtain_q_x_a()
             
-            supply_previous = gamma*np.sort(np.random.randint(low=1, high=cfg.setting.max_supply, size=n_action)) + (1-gamma)*np.sort(np.random.randint(low=1, high=cfg.setting.max_supply, size=n_action))[::-1]
-            # supply_previous = np.ones(n_action)
+            supply_previous = (gamma*np.sort(np.random.randint(low=1, high=cfg.setting.max_supply, size=n_action)) + (1-gamma)*np.sort(np.random.randint(low=1, high=cfg.setting.max_supply, size=n_action))[::-1]).astype(int)
+
             supply_new = supply_previous.copy()
             supply_first = supply_previous.copy()
             x = supply_previous.copy()
@@ -143,6 +143,8 @@ def main(cfg: DictConfig) -> None:
                 supply_new[arm_new] -= click_new
                 regret_sum_list_new.append(regret_sum_list_new[i-1]+regret_value_new)
             
+            if ((supply_new>0).sum() >= 1) or ((supply_previous>0).sum() >= 1):
+                    raise ValueError(f"supply must be above 0, but got supply_new={supply_new} and supply_previous={supply_previous}")
             # arm_reward_previous /= n_select_arm_previous
             # arm_reward_new /= n_select_arm_new
         
