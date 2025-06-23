@@ -133,4 +133,4 @@ for i, type_name in enumerate(supply_type_list):
 
 df = pd.DataFrame(records)
 
-df.to_csv('main_OPL_q_hat_is_true.csv', index=False)
+df.to_csv('main_supply_q_hat_is_true.csv', index=False)
