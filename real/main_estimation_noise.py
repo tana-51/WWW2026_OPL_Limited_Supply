@@ -1,6 +1,7 @@
 """
-実際に、OPLをして実験。
+OPLをして実験。
 - reg-based (true, q_hat, noise)
+q_hatのノイズを変化
 """
 
 import numpy as np
