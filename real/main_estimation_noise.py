@@ -30,7 +30,9 @@ n_actions = 1000
 reward_std = 1.0
 max_supply = 10
 n_step = (n_actions*max_supply)+1
-#noise = "true" #estimate, true, noise
+random_state = 12345
+np.random.seed(random_state)
+random_ = check_random_state(random_state)
 supply_type_list = ["random", "supply_demand_law", "inverse"]
 noise_list = ["true",0.5, 1.0, 3.0, 5.0, "estimate"]
 
@@ -44,8 +46,8 @@ for supply_type in supply_type_list:
         n_actions=n_actions,
         dim_context=10,
         reward_std=reward_std,
-        beta=1.0,
-        random_state=12345,
+        beta=beta,
+        random_state=ramdom_state,
         n_users=n_users,
         n_step=n_step,
         max_supply=max_supply,
