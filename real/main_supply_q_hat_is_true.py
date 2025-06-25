@@ -10,6 +10,7 @@ import pandas as pd
 import seaborn as sns
 from tqdm import tqdm
 from sklearn.neural_network import MLPRegressor
+from sklearn.utils import check_random_state
 
 from dataset import RealBanditDatasetLimittedSupply
 
@@ -28,7 +29,7 @@ num_runs = 100
 n_users = 1411
 n_actions = 1000
 reward_std = 1.0
-beta = 1.0
+beta = -0.5
 max_supply = 10
 n_step = (n_actions*max_supply)+1
 random_state = 12345
