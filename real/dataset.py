@@ -78,7 +78,8 @@ class RealBanditDatasetLimittedSupply(BaseBanditDataset):
         
         # expected reward function
         fixed_q_x_a = self.interactions[np.ix_(user_idx,action_idx)]
-        pi_b_logits = fixed_q_x_a.copy()
+        # pi_b_logits = fixed_q_x_a.copy()
+        pi_b_logits = fixed_q_x_a + np.random.normal(loc=0.0, scale=3.0, size=fixed_q_x_a.shape)
 
         # calculate the action choice probabilities of the behavior policy
         fixed_pi_b = softmax(self.beta * pi_b_logits)
