@@ -54,6 +54,7 @@ def main(cfg: DictConfig) -> None:
     noise_list = cfg.setting.noise.noise_list
 
     last_value_list = []
+    r_df_list = []
     for supply_type in supply_type_list:
         plt.style.use('ggplot')
         fig = plt.figure(figsize=(7,7),tight_layout=True)
@@ -128,7 +129,7 @@ def main(cfg: DictConfig) -> None:
                 regret_sum_list_previous = [0]
                 
                 new_agent = NewAgent()
-                new_agent.set_regret(q_hat)
+                new_agent.obtain_opls_value(q_hat, user_idx=bandit_data["user_idx"])
                 new_agent_revenue = 0
                 new_agent_revenue_list = []
                 n_select_arm_new = np.zeros(n_action)
@@ -176,6 +177,16 @@ def main(cfg: DictConfig) -> None:
                 new += np.array(new_agent_revenue_list)
                 previous_regret += np.array(regret_sum_list_previous[1:])
                 new_regret += np.array(regret_sum_list_new[1:])
+
+                r_df = DataFrame()
+                r_df["value"] = [new_agent_revenue_list[-1] / previous_agent_revenue_list[-1]]
+                # r_df["step"] = np.arange(n_step)+1
+                r_df["noise"] = noise
+                r_df["supply_type"] = supply_type
+                r_df_list.append(r_df)
+
+                result_df = pd.concat(r_df_list).reset_index(level=0)
+                result_df.to_csv("estimation_noise.csv")
                 
             result_list.append((new/num_runs)/(previous/num_runs))
             ax.plot((new/num_runs)/(previous/num_runs), label=f"$\lambda$={lambda_}, noise={noise}")
@@ -208,7 +219,7 @@ def main(cfg: DictConfig) -> None:
     df["noise"] = noise_list
     for i, supply_type in enumerate(supply_type_list):
         df[supply_type] = last_value_list[i]
-    df.to_csv(f"unoise_vs_lastvalue.csv", index=False)
+    df.to_csv(f"noise_vs_lastvalue.csv", index=False)
 
     fig = plt.figure(figsize=(7,7),tight_layout=True)
     ax = fig.add_subplot(1,1,1)
@@ -222,6 +233,9 @@ def main(cfg: DictConfig) -> None:
     # plt.title(f"n_users = {n_users}, n_actions = {n_action}")
     plt.savefig("noise_vs_lastvalue.png")
     plt.show()
+
+    result_df = pd.concat(r_df_list).reset_index(level=0)
+    result_df.to_csv("estimation_noise.csv")
 
 if __name__ == "__main__":
     main()

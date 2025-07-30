@@ -44,17 +44,32 @@ def plot_heat(step_idx_list, item_for_user, name, n_users, n_action):
         
         for i in range(n_action):
             df = DataFrame()
-            df["user_idx"] = np.arange(n_users)
-            df["item_idx"] = i
+            df["user_idx"] = np.arange(n_users) +1
+            df["item_idx"] = i+1
             df["value"] = item_for_user[np.arange(n_users),i,step_idx]
             df_list.append(df)
-
+        # print(df["value"].max())
         df = pd.concat(df_list, axis=0)
         df = pd.pivot_table(data=df, values='value', columns='item_idx', index='user_idx', aggfunc="sum")
-        fontsize = 20
+        fontsize = 30
+        # fig = plt.figure(figsize=(10,7),tight_layout=True)
         plt.style.use('ggplot')
-        plt.figure(figsize=(12, 9))
-        sns.heatmap(df, annot=True, fmt='g', cmap='Blues')
+        plt.figure(figsize=(10, 7),tight_layout=True)
+        # sns.heatmap(df, annot=True, fmt=".2f", cmap='Blues',vmin=0, vmax=1.0, annot_kws={"size": 20})
+        # Heatmap を描画して軸を受け取る
+        ax = sns.heatmap(
+            df,
+            annot=True,
+            fmt=".2f",
+            cmap='Blues',
+            vmin=0,
+            vmax=1.0,
+            annot_kws={"size": 20}
+        )
+
+        # カラーバーのフォントサイズを変更
+        colorbar = ax.collections[0].colorbar
+        colorbar.ax.tick_params(labelsize=20)
         plt.title(f"timestep = {step_idx}",fontsize=fontsize)
         plt.xlabel("item index",fontsize=fontsize)
         plt.ylabel("user index",fontsize=fontsize)
@@ -64,7 +79,7 @@ def plot_heat(step_idx_list, item_for_user, name, n_users, n_action):
         plt.close()
         
         plt.style.use('ggplot')
-        plt.figure(figsize=(12, 9))
+        plt.figure(figsize=(10, 7))
         plt.bar(np.arange(n_action),item_for_user[:,:,step_idx].sum(axis=0))
         plt.title(f"timestep = {step_idx}",fontsize=fontsize)
         plt.xlabel("item index",fontsize=fontsize)
@@ -107,6 +122,7 @@ def main(cfg: DictConfig) -> None:
                 supply_type=supply_type,
             )
     fixed_q_x_a, fixed_click, fixed_conversion = dataset.obtain_q_x_a()
+    np.savetxt("fixed_q_x_a.csv", fixed_q_x_a, delimiter=",", fmt="%f") 
     
     previous = np.zeros(n_step)
     new = np.zeros(n_step)
@@ -115,8 +131,11 @@ def main(cfg: DictConfig) -> None:
     
     item_for_user_previous_ = np.zeros((n_users, n_action, n_step))
     item_for_user_new_ = np.zeros((n_users, n_action, n_step))
-    
+
+    r_df_list = []
     for _ in tqdm(range(num_runs), desc=f"lambda = {lambda_}"):
+
+        bandit_data = dataset.obtain_batch_bandit_feedback()
         item_for_user_previous = np.zeros((n_users, n_action, n_step))
         item_for_user_new = np.zeros((n_users, n_action, n_step))
         
@@ -130,7 +149,7 @@ def main(cfg: DictConfig) -> None:
         supply_first = supply_previous.copy()
         supply_new = supply_previous.copy()
         x = supply_previous.copy()
-        
+
         previous_agent = PreviousAgent()
         previous_agent.set_regret(fixed_q_x_a)
         previous_agent_revenue = 0
@@ -140,7 +159,7 @@ def main(cfg: DictConfig) -> None:
         regret_sum_list_previous = [0]
         
         new_agent = NewAgent()
-        new_agent.set_regret(fixed_q_x_a)
+        new_agent.obtain_opls_value(fixed_q_x_a, user_idx=bandit_data["user_idx"])
         new_agent_revenue = 0
         new_agent_revenue_list = []
         n_select_arm_new = np.zeros(n_action)
@@ -161,16 +180,17 @@ def main(cfg: DictConfig) -> None:
                 r_previous = np.random.normal(loc=fixed_conversion[user_idx, arm_previous], scale=cfg.setting.reward_std)*click_previous
                 arm_reward_previous[arm_previous] += r_previous
                 if i==0:
-                    item_for_user_previous[user_idx,arm_previous,i] += 1/(supply_first[arm_previous]*num_runs)
+                    item_for_user_previous[user_idx,arm_previous,i] += click_previous/(supply_first[arm_previous]*num_runs)
                 else:
                     item_for_user_previous[:,:,i] = item_for_user_previous[:,:,i-1].copy()
-                    item_for_user_previous[user_idx,arm_previous,i] += 1/(supply_first[arm_previous]*num_runs)
+                    item_for_user_previous[user_idx,arm_previous,i] += click_previous/(supply_first[arm_previous]*num_runs)
             previous_agent_revenue += r_previous
             previous_agent_revenue_list.append(previous_agent_revenue)
             supply_previous[arm_previous] -= click_previous
             regret_sum_list_previous.append(regret_sum_list_previous[i-1]+regret_value_previous)
         
             arm_new, regret_value_new = new_agent.select_arm(user_idx=user_idx, fixed_q_x_a=fixed_q_x_a, supply=supply_new)
+
             if (supply_new>=1).sum() ==0:
                 click_new = 0
                 r_new = 0
@@ -180,11 +200,15 @@ def main(cfg: DictConfig) -> None:
                 n_select_arm_new[arm_new] += 1*click_new
                 r_new = np.random.normal(loc=fixed_conversion[user_idx, arm_new], scale=cfg.setting.reward_std)*click_new
                 arm_reward_new[arm_new] += r_new
+                # print("arm", supply_new[arm_new])
+                # print("supply",(supply_new>=1).sum())
+                # print("supply",supply_new)
                 if i ==0: 
-                    item_for_user_new[user_idx,arm_new,i] += 1/(supply_first[arm_new]*num_runs)
+                    item_for_user_new[user_idx,arm_new,i] += click_new/(supply_first[arm_new]*num_runs)
                 else:
                     item_for_user_new[:,:,i] = item_for_user_new[:,:,i-1].copy()
-                    item_for_user_new[user_idx,arm_new,i] += 1/(supply_first[arm_new]*num_runs)
+                    item_for_user_new[user_idx,arm_new,i] += click_new/(supply_first[arm_new]*num_runs)
+                    # print(f"{user_idx,arm_new,i}", item_for_user_new[user_idx,arm_new,i])
             new_agent_revenue += r_new
             new_agent_revenue_list.append(new_agent_revenue)
             supply_new[arm_new] -= click_new
@@ -192,7 +216,7 @@ def main(cfg: DictConfig) -> None:
         
 
         if ((supply_new>0).sum() >= 1) or ((supply_previous>0).sum() >= 1):
-                    raise ValueError(f"supply must be above 0, but got supply_new={supply_new} and supply_previous={supply_previous}")
+            raise ValueError(f"supply must be above 0, but got supply_new={supply_new} and supply_previous={supply_previous}")
         
         # arm_reward_previous /= n_select_arm_previous
         # arm_reward_new /= n_select_arm_new
@@ -203,18 +227,30 @@ def main(cfg: DictConfig) -> None:
         new_regret += np.array(regret_sum_list_new[1:])
         item_for_user_previous_ += item_for_user_previous
         item_for_user_new_ += item_for_user_new
+
+        r_df = DataFrame()
+        r_df["new_value"] = new_agent_revenue_list
+        r_df["previous_value"] = previous_agent_revenue_list
+        r_df["step"] = np.arange(n_step)+1
+        # r_df["lambda"] = lambda_
+        r_df["supply_type"] = supply_type
+        r_df_list.append(r_df)
+
+        result_df = pd.concat(r_df_list).reset_index(level=0)
+        result_df.to_csv("heatmap.csv")
+        
     result_list.append((new/num_runs)/(previous/num_runs))
     regret_list.append([previous_regret/num_runs,new_regret/num_runs])
 
     plt.style.use('ggplot')
-    fig = plt.figure(figsize=(7,7),tight_layout=True)
+    fig = plt.figure(figsize=(10,7),tight_layout=True)
     ax = fig.add_subplot(1,1,1)
-    ax.plot((new/num_runs)/(previous/num_runs), label=f"$\lambda$={lambda_}")
+    ax.plot((new/num_runs)/(previous/num_runs), label=f"$\lambda$={lambda_}",linewidth=4,)
     # plt.plot(new/num_runs, label="regret_based")
-    ax.legend()
+    # ax.legend()
 
     ax.set_xlabel("Time Step",fontsize=12)
-    ax.set_ylabel("Relative Reward (Ours/previous)",fontsize=12)
+    ax.set_ylabel("Relative policy value (Ours/previous)",fontsize=12)
     # plt.title(f"n_users = {n_users}, n_actions = {n_action}")
     plt.title(f"Supply Type: {supply_type}")
     ax.axhline(1.0, 0, n_step, color="black", linestyle='dashed')

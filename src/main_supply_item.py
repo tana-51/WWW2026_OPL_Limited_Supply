@@ -61,7 +61,7 @@ def main(cfg: DictConfig) -> None:
 
     result_list = []
     regret_list = []
-
+    r_df_list = []
     plt.style.use('ggplot')
     fig = plt.figure(figsize=(7,7),tight_layout=True)
     ax = fig.add_subplot(1,1,1)
@@ -87,10 +87,23 @@ def main(cfg: DictConfig) -> None:
         arm_reward_previous = np.zeros(n_action)
         arm_reward_new = np.zeros(n_action)
         for _ in tqdm(range(num_runs), desc=f"supply_type = {supply_type}, gamma = {gamma}"):
-
-            fixed_q_x_a, fixed_click, fixed_conversion = dataset.obtain_q_x_a()
             
-            supply_previous = (gamma*np.sort(np.random.randint(low=1, high=cfg.setting.max_supply, size=n_action)) + (1-gamma)*np.sort(np.random.randint(low=1, high=cfg.setting.max_supply, size=n_action))[::-1]).astype(int)
+            bandit_data = dataset.obtain_batch_bandit_feedback()
+            
+            fixed_q_x_a, fixed_click, fixed_conversion = dataset.obtain_q_x_a()
+            inverse_supply = obtain_supply(
+                    n_action=n_action,
+                    fixed_q_x_a=fixed_q_x_a,
+                    max_supply=cfg.setting.max_supply,
+                    supply_type="inverse",
+                )
+            increase_supply = obtain_supply(
+                    n_action=n_action,
+                    fixed_q_x_a=fixed_q_x_a,
+                    max_supply=cfg.setting.max_supply,
+                    supply_type="supply_demand_law",
+                )
+            supply_previous = ((gamma*inverse_supply) + (1-gamma)*increase_supply).astype(int)
 
             supply_new = supply_previous.copy()
             supply_first = supply_previous.copy()
@@ -105,7 +118,7 @@ def main(cfg: DictConfig) -> None:
             regret_sum_list_previous = [0]
             
             new_agent = NewAgent()
-            new_agent.set_regret(fixed_q_x_a)
+            new_agent.obtain_opls_value(fixed_q_x_a, user_idx=bandit_data["user_idx"])
             new_agent_revenue = 0
             new_agent_revenue_list = []
             n_select_arm_new = np.zeros(n_action)
@@ -152,6 +165,16 @@ def main(cfg: DictConfig) -> None:
             new += np.array(new_agent_revenue_list)
             previous_regret += np.array(regret_sum_list_previous[1:])
             new_regret += np.array(regret_sum_list_new[1:])
+
+            r_df = DataFrame()
+            r_df["value"] = [new_agent_revenue_list[-1] / previous_agent_revenue_list[-1]]
+            # r_df["step"] = np.arange(n_step)+1
+            r_df["gamma"] = gamma
+            r_df["supply_type"] = supply_type
+            r_df_list.append(r_df)
+
+            result_df = pd.concat(r_df_list).reset_index(level=0)
+            result_df.to_csv("gamma.csv")
             
         result_list.append((new/num_runs)/(previous/num_runs))
         regret_list.append([previous_regret/num_runs,new_regret/num_runs])
@@ -201,6 +224,9 @@ def main(cfg: DictConfig) -> None:
     plt.title(f"n_users = {n_users}, n_actions = {n_action}")
     plt.savefig("gamma_vs_lastvalue.png")
     plt.show()
+
+    result_df = pd.concat(r_df_list).reset_index(level=0)
+    result_df.to_csv("gamma.csv")
 
 if __name__ == "__main__":
     main()

@@ -52,6 +52,7 @@ def main(cfg: DictConfig) -> None:
     supply_type_list = cfg.setting.user_action_ratio.supply_type_list
 
     last_value_list = []
+    r_df_list = []
     for supply_type in supply_type_list:
         plt.style.use('ggplot')
         fig = plt.figure(figsize=(7,7),tight_layout=True)
@@ -100,6 +101,8 @@ def main(cfg: DictConfig) -> None:
             previous_regret = np.zeros(n_step)
             new_regret = np.zeros(n_step)
             for _ in tqdm(range(num_runs), desc=f"supply_type = {supply_type}, n_users = {n_users}"):
+                
+                bandit_data = dataset.obtain_batch_bandit_feedback()
 
                 fixed_q_x_a, fixed_click, fixed_conversion = dataset.obtain_q_x_a()
                 
@@ -123,7 +126,7 @@ def main(cfg: DictConfig) -> None:
                 regret_sum_list_previous = [0]
                 
                 new_agent = NewAgent()
-                new_agent.set_regret(fixed_q_x_a)
+                new_agent.obtain_opls_value(fixed_q_x_a, user_idx=bandit_data["user_idx"])
                 new_agent_revenue = 0
                 new_agent_revenue_list = []
                 n_select_arm_new = np.zeros(n_action)
@@ -171,6 +174,16 @@ def main(cfg: DictConfig) -> None:
                 new += np.array(new_agent_revenue_list)
                 previous_regret += np.array(regret_sum_list_previous[1:])
                 new_regret += np.array(regret_sum_list_new[1:])
+
+                r_df = DataFrame()
+                r_df["value"] = [new_agent_revenue_list[-1] / previous_agent_revenue_list[-1]]
+                # r_df["step"] = np.arange(n_step)+1
+                r_df["ratio"] = n_users/ n_action
+                r_df["supply_type"] = supply_type
+                r_df_list.append(r_df)
+
+                result_df = pd.concat(r_df_list).reset_index(level=0)
+                result_df.to_csv("user_action_ratio.csv")
                 
             result_list.append((new/num_runs)/(previous/num_runs))
             ax.plot((new/num_runs)/(previous/num_runs), label=f"$\lambda$={lambda_}, ratio={n_users/n_action}")
@@ -217,6 +230,9 @@ def main(cfg: DictConfig) -> None:
     # plt.title(f"n_users = {n_users}, n_actions = {n_action}")
     plt.savefig("user_action_rartio_vs_lastvalue.png")
     plt.show()
+
+    result_df = pd.concat(r_df_list).reset_index(level=0)
+    result_df.to_csv("user_action_ratio.csv")
 
 if __name__ == "__main__":
     main()

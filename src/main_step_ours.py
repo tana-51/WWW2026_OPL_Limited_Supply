@@ -1,6 +1,6 @@
 """
 有限のstepの場合
-ナイーブ手法
+仮に、提案を使った時に、売り切れるかどうかを判定
 """
 
 from omegaconf import DictConfig, OmegaConf
@@ -36,9 +36,40 @@ from obp.ope import(
 
 from agent.agent import(
     PreviousAgent,
+    NewAgent,
     NewAgentStep,
 ) 
 
+def obtain_p_a(fixed_q_x_a, supply_new, n_users, fixed_click, coef_, user_idx_):
+    new_agent = NewAgent()
+    new_agent.obtain_opls_value(fixed_q_x_a, coef_=coef_, user_idx=user_idx_)
+    p_a = np.zeros(fixed_q_x_a.shape[1])
+    for user_idx in range(n_users):
+        arm_new, regret_value_new = new_agent.select_arm(user_idx=user_idx, fixed_q_x_a=fixed_q_x_a, supply=supply_new)
+        p_a[arm_new] += fixed_click[user_idx, arm_new]/n_users
+
+    return p_a
+
+def estimate_sold_action(fixed_q_x_a, supply_new, n_users, n_step, fixed_click, user_idx):
+    supply_new_ = supply_new.astype(float).copy()
+    coef_ = np.ones(fixed_q_x_a.shape[1])
+    for _ in range(1):
+        supply_new = supply_new_.copy()
+        p_a = obtain_p_a(fixed_q_x_a, supply_new, n_users, fixed_click, coef_, user_idx)
+        k = 0
+        for i in range(n_step):
+            supply_new[np.arange(fixed_q_x_a.shape[1])] -= p_a[np.arange(fixed_q_x_a.shape[1])]
+
+            if (supply_new < 1).sum()>k:
+                if np.all(supply_new < 1):
+                    # print("break")
+                    break
+                p_a = obtain_p_a(fixed_q_x_a, supply_new, n_users, fixed_click, coef_, user_idx)
+                k = (supply_new < 1).sum()
+        coef_ = (supply_new < 1).astype(int)
+        # print(coef_.sum())
+
+    return coef_
 
 
 @hydra.main(config_path="../conf",config_name="config", version_base="1.1")
@@ -146,12 +177,8 @@ def main(cfg: DictConfig) -> None:
                 regret_sum_list_previous = [0]
                 
                 new_agent = NewAgentStep()
-                if (supply_new>=1).sum() == 0:
-                    coef_ = np.ones(n_action) # 売り切れは1
-                else:
-                    # coef_ = supply_new - (n_step / (supply_new>=1).sum())*np.average(fixed_click, axis=0)
-                    coef_ = supply_new - (n_step / (supply_new>=1).sum())*np.average(estimated_click_probability, axis=0)
-                    coef_ = (coef_ <= 0).astype(int) # 売り切れは1
+                # coef_ = estimate_sold_action(fixed_q_x_a, supply_new, n_users, n_step, fixed_click)
+                coef_ = estimate_sold_action(fixed_q_x_a, supply_new, n_users, n_step, estimated_click_probability, user_idx=bandit_data["user_idx"])
                 new_agent.obtain_opls_value(fixed_q_x_a, coef_=coef_, user_idx=bandit_data["user_idx"])
                 new_agent_revenue = 0
                 new_agent_revenue_list = []
@@ -206,7 +233,6 @@ def main(cfg: DictConfig) -> None:
                 #     raise ValueError(f"supply must be above 0, but got supply_new={supply_new} and supply_previous={supply_previous}")
                 # arm_reward_previous /= n_select_arm_previous
                 # arm_reward_new /= n_select_arm_new
-                # print(f"supply_new={supply_new.sum()/x.sum()}, supply_previous={supply_previous.sum()/x.sum()}")
 
                 previous += np.array(previous_agent_revenue_list)
                 new += np.array(new_agent_revenue_list)
@@ -221,13 +247,11 @@ def main(cfg: DictConfig) -> None:
                 r_df_list.append(r_df)
 
                 result_df = pd.concat(r_df_list).reset_index(level=0)
-                result_df.to_csv("step.csv")
+                result_df.to_csv("step_ours.csv")
                 
             result_list.append((new/num_runs)/(previous/num_runs))
             ax.plot((new/num_runs)/(previous/num_runs), label=f"$\lambda$={lambda_}, step={n_step}")
             # plt.plot(new/num_runs, label="regret_based")
-            print(f"supply_new={supply_new.sum()/x.sum()}, supply_previous={supply_previous.sum()/x.sum()}")
-            print("-------"*10)
         ax.legend()
 
         ax.set_xlabel("Time Step",fontsize=12)
@@ -272,7 +296,7 @@ def main(cfg: DictConfig) -> None:
     plt.show()
 
     result_df = pd.concat(r_df_list).reset_index(level=0)
-    result_df.to_csv("step.csv")
+    result_df.to_csv("step_ours.csv")
 
 if __name__ == "__main__":
     main()

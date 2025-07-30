@@ -121,6 +121,8 @@ class SyntheticBanditDatasetLimittedSupply(BaseBanditDataset):
         reward_list = []
         pscore_list = []
         supply_list = []
+        click_list = []
+
         for i in range(self.n_step):
             user_idx = self.random_.randint(low=0, high=self.n_users)
             pi_b_logits_ = self.beta * pi_b_logits[user_idx, unique_action_set]
@@ -139,6 +141,7 @@ class SyntheticBanditDatasetLimittedSupply(BaseBanditDataset):
             pscore_list.append(pi_b[sampled_action_index])
             supply_list.append(supply.reshape(1,-1))
             supply[action] -= click
+            click_list.append(click)
 
             # delete action
             unique_action_set = np.delete(
@@ -165,7 +168,8 @@ class SyntheticBanditDatasetLimittedSupply(BaseBanditDataset):
             n_step= self.n_step,
             max_supply= self.max_supply,
             supply_each_step=np.concatenate(supply_list,axis=0),
-            context_supply=np.concatenate([fixed_user_context[np.array(user_idx_list)],np.concatenate(supply_list,axis=0)],axis=1)
+            context_supply=np.concatenate([fixed_user_context[np.array(user_idx_list)],np.concatenate(supply_list,axis=0)],axis=1),
+            click=np.array(click_list),
         )
 
     def calc_ground_truth_policy_value(
