@@ -52,6 +52,7 @@ def main(cfg: DictConfig) -> None:
     supply_type_list = cfg.setting.lambda_.supply_type_list
 
     last_value_list = []
+    r_df_list = []
     for supply_type in supply_type_list:
         plt.style.use('ggplot')
         fig = plt.figure(figsize=(7,7),tight_layout=True)
@@ -128,7 +129,7 @@ def main(cfg: DictConfig) -> None:
                 regret_sum_list_previous = [0]
                 
                 new_agent = NewAgent()
-                new_agent.set_regret(fixed_q_x_a)
+                new_agent.obtain_opls_value(fixed_q_x_a=fixed_q_x_a, user_idx=bandit_data["user_idx"])
                 # new_agent.set_regret(q_hat)
                 new_agent_revenue = 0
                 new_agent_revenue_list = []
@@ -180,6 +181,16 @@ def main(cfg: DictConfig) -> None:
                 previous_regret += np.array(regret_sum_list_previous[1:])
                 new_regret += np.array(regret_sum_list_new[1:])
 
+                r_df = DataFrame()
+                r_df["value"] = [new_agent_revenue_list[-1] / previous_agent_revenue_list[-1]]
+                # r_df["step"] = np.arange(n_step)+1
+                r_df["lambda"] = lambda_
+                r_df["supply_type"] = supply_type
+                r_df_list.append(r_df)
+
+                result_df = pd.concat(r_df_list).reset_index(level=0)
+                result_df.to_csv("lambda.csv")
+                
             result_list.append((new/num_runs)/(previous/num_runs))
             regret_list.append([previous_regret/num_runs,new_regret/num_runs])
             arm_reward_previous /= num_runs
@@ -228,6 +239,9 @@ def main(cfg: DictConfig) -> None:
     plt.title(f"n_users = {n_users}, n_actions = {n_action}")
     plt.savefig("lambda_vs_lastvalue.png")
     plt.show()
+
+    result_df = pd.concat(r_df_list).reset_index(level=0)
+    result_df.to_csv("lambda.csv")
 
 
 
