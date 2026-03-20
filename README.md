@@ -12,6 +12,9 @@ coming soon...
 ## Setup
 The Python environment is built using uv. You can build the same environment as in our experiments by cloning the repository and running uv sync directly under the folder.
 ```
+# clone the repository
+git clone https://github.com/tana-51/WWW2026_OPL_Limited_Supply.git
+
 # build the environment with uv
 uv sync
 
