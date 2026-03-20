@@ -1,6 +1,3 @@
-"""
-各stepで、どのアイテムを推薦しているかをヒートマップで描画
-"""
 from omegaconf import DictConfig, OmegaConf
 import hydra
 import numpy as np
@@ -48,15 +45,14 @@ def plot_heat(step_idx_list, item_for_user, name, n_users, n_action):
             df["item_idx"] = i+1
             df["value"] = item_for_user[np.arange(n_users),i,step_idx]
             df_list.append(df)
-        # print(df["value"].max())
+
         df = pd.concat(df_list, axis=0)
         df = pd.pivot_table(data=df, values='value', columns='item_idx', index='user_idx', aggfunc="sum")
         fontsize = 30
-        # fig = plt.figure(figsize=(10,7),tight_layout=True)
+
         plt.style.use('ggplot')
         plt.figure(figsize=(10, 7),tight_layout=True)
-        # sns.heatmap(df, annot=True, fmt=".2f", cmap='Blues',vmin=0, vmax=1.0, annot_kws={"size": 20})
-        # Heatmap を描画して軸を受け取る
+        
         ax = sns.heatmap(
             df,
             annot=True,
@@ -67,7 +63,6 @@ def plot_heat(step_idx_list, item_for_user, name, n_users, n_action):
             annot_kws={"size": 20}
         )
 
-        # カラーバーのフォントサイズを変更
         colorbar = ax.collections[0].colorbar
         colorbar.ax.tick_params(labelsize=20)
         plt.title(f"timestep = {step_idx}",fontsize=fontsize)
@@ -116,7 +111,7 @@ def main(cfg: DictConfig) -> None:
                 beta=cfg.setting.beta,
                 random_state=cfg.setting.random_state,
                 n_users=n_users,
-                lambda_=lambda_, #小さいほど好みが揃う
+                lambda_=lambda_, 
                 n_step=n_step,
                 max_supply=cfg.setting.max_supply,
                 supply_type=supply_type,
@@ -200,15 +195,13 @@ def main(cfg: DictConfig) -> None:
                 n_select_arm_new[arm_new] += 1*click_new
                 r_new = np.random.normal(loc=fixed_conversion[user_idx, arm_new], scale=cfg.setting.reward_std)*click_new
                 arm_reward_new[arm_new] += r_new
-                # print("arm", supply_new[arm_new])
-                # print("supply",(supply_new>=1).sum())
-                # print("supply",supply_new)
+ 
                 if i ==0: 
                     item_for_user_new[user_idx,arm_new,i] += click_new/(supply_first[arm_new]*num_runs)
                 else:
                     item_for_user_new[:,:,i] = item_for_user_new[:,:,i-1].copy()
                     item_for_user_new[user_idx,arm_new,i] += click_new/(supply_first[arm_new]*num_runs)
-                    # print(f"{user_idx,arm_new,i}", item_for_user_new[user_idx,arm_new,i])
+
             new_agent_revenue += r_new
             new_agent_revenue_list.append(new_agent_revenue)
             supply_new[arm_new] -= click_new
@@ -217,9 +210,6 @@ def main(cfg: DictConfig) -> None:
 
         if ((supply_new>0).sum() >= 1) or ((supply_previous>0).sum() >= 1):
             raise ValueError(f"supply must be above 0, but got supply_new={supply_new} and supply_previous={supply_previous}")
-        
-        # arm_reward_previous /= n_select_arm_previous
-        # arm_reward_new /= n_select_arm_new
     
         previous += np.array(previous_agent_revenue_list)
         new += np.array(new_agent_revenue_list)
@@ -232,7 +222,6 @@ def main(cfg: DictConfig) -> None:
         r_df["new_value"] = new_agent_revenue_list
         r_df["previous_value"] = previous_agent_revenue_list
         r_df["step"] = np.arange(n_step)+1
-        # r_df["lambda"] = lambda_
         r_df["supply_type"] = supply_type
         r_df_list.append(r_df)
 
@@ -246,12 +235,10 @@ def main(cfg: DictConfig) -> None:
     fig = plt.figure(figsize=(10,7),tight_layout=True)
     ax = fig.add_subplot(1,1,1)
     ax.plot((new/num_runs)/(previous/num_runs), label=f"$\lambda$={lambda_}",linewidth=4,)
-    # plt.plot(new/num_runs, label="regret_based")
-    # ax.legend()
+
 
     ax.set_xlabel("Time Step",fontsize=12)
     ax.set_ylabel("Relative policy value (Ours/previous)",fontsize=12)
-    # plt.title(f"n_users = {n_users}, n_actions = {n_action}")
     plt.title(f"Supply Type: {supply_type}")
     ax.axhline(1.0, 0, n_step, color="black", linestyle='dashed')
     plt.savefig(f"val_lambda_{supply_type}.png")

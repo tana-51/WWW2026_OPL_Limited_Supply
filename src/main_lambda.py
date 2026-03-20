@@ -1,7 +1,3 @@
-"""
-好みの一致度合いを変化させる
-- reg-based
-"""
 from omegaconf import DictConfig, OmegaConf
 import hydra
 import numpy as np
@@ -69,7 +65,7 @@ def main(cfg: DictConfig) -> None:
                 beta=cfg.setting.beta,
                 random_state=cfg.setting.random_state,
                 n_users=n_users,
-                lambda_=lambda_, #小さいほど好みが揃う
+                lambda_=lambda_, 
                 n_step=n_step,
                 max_supply=cfg.setting.max_supply,
                 supply_type=supply_type,
@@ -84,8 +80,7 @@ def main(cfg: DictConfig) -> None:
             arm_reward_new = np.zeros(n_action)
             arm_reward_new_q_hat = np.zeros(n_action)
             for _ in tqdm(range(num_runs), desc=f"supply_type = {supply_type},lambda = {lambda_}"):
-                # fixed_q_x_a, fixed_click, fixed_conversion = dataset.obtain_q_x_a()
-
+                
                 #obtain q_hat
                 bandit_data = dataset.obtain_batch_bandit_feedback()
                 reg_model = RegressionModel(
@@ -114,15 +109,14 @@ def main(cfg: DictConfig) -> None:
                     max_supply=cfg.setting.max_supply,
                     supply_type=supply_type,
                 )
-                # print(supply_previous)
-                # supply_previous = np.ones(n_action)
+
                 supply_new = supply_previous.copy()
                 supply_first = supply_previous.copy()
                 x = supply_previous.copy()
                 
                 previous_agent = PreviousAgent()
                 previous_agent.set_regret(fixed_q_x_a)
-                # previous_agent.set_regret(q_hat)
+
                 previous_agent_revenue = 0
                 previous_agent_revenue_list = []
                 n_select_arm_previous = np.zeros(n_action)
@@ -130,7 +124,7 @@ def main(cfg: DictConfig) -> None:
                 
                 new_agent = NewAgent()
                 new_agent.obtain_opls_value(fixed_q_x_a=fixed_q_x_a, user_idx=bandit_data["user_idx"])
-                # new_agent.set_regret(q_hat)
+
                 new_agent_revenue = 0
                 new_agent_revenue_list = []
                 n_select_arm_new = np.zeros(n_action)
@@ -173,8 +167,6 @@ def main(cfg: DictConfig) -> None:
                 if ((supply_new>0).sum() >= 1) or ((supply_previous>0).sum() >= 1):
                     raise ValueError(f"supply must be above 0, but got supply_new={supply_new} and supply_previous={supply_previous}")
         
-                # arm_reward_previous /= n_select_arm_previous
-                # arm_reward_new /= n_select_arm_new
 
                 previous += np.array(previous_agent_revenue_list)
                 new += np.array(new_agent_revenue_list)
@@ -183,7 +175,6 @@ def main(cfg: DictConfig) -> None:
 
                 r_df = DataFrame()
                 r_df["value"] = [new_agent_revenue_list[-1] / previous_agent_revenue_list[-1]]
-                # r_df["step"] = np.arange(n_step)+1
                 r_df["lambda"] = lambda_
                 r_df["supply_type"] = supply_type
                 r_df_list.append(r_df)
@@ -196,12 +187,10 @@ def main(cfg: DictConfig) -> None:
             arm_reward_previous /= num_runs
             arm_reward_new /= num_runs
             ax.plot((new/num_runs)/(previous/num_runs), label=f"$\lambda$={lambda_}")
-            # plt.plot(new/num_runs, label="regret_based")
         ax.legend()
 
         ax.set_xlabel("Time Step",fontsize=12)
         ax.set_ylabel("Relative Reward (Ours/previous)",fontsize=12)
-        # plt.title(f"n_users = {n_users}, n_actions = {n_action}")
         plt.title(f"Supply Type: {supply_type}")
         ax.axhline(1.0, 0, n_step, color="black", linestyle='dashed')
         plt.savefig(f"val_lambda_{supply_type}.png")
@@ -213,13 +202,6 @@ def main(cfg: DictConfig) -> None:
             last_value.append(result_list[i][-1])
         
         last_value_list.append(last_value)
-        # ax.plot(lambda_list, last_value, "-o", label="ours")
-        # ax.set_xlabel("$\lambda$",fontsize=12)
-        # ax.set_ylabel("Relative Reward (Ours/previous)",fontsize=12)
-        # ax.legend()
-        # plt.title(f"n_users = {n_users}, n_actions = {n_action}")
-        # # plt.savefig("output/lambda_vs_lastvalue.png")
-        # plt.show()
 
     df = DataFrame()
     df["lambda"] = lambda_list
@@ -242,23 +224,6 @@ def main(cfg: DictConfig) -> None:
 
     result_df = pd.concat(r_df_list).reset_index(level=0)
     result_df.to_csv("lambda.csv")
-
-
-
-    # plt.bar(np.arange(n_action), arm_reward_previous, align="edge",width=-0.3)
-    # plt.bar(np.arange(n_action), arm_reward_new, align="edge",width=0.3)
-    # plt.xlabel("item index",fontsize=12)
-    # plt.ylabel("reward",fontsize=12)
-    # plt.legend(["previous","ours"])
-    # plt.show()
-
-    # plt.plot(regret_list[0][0])
-    # plt.plot(regret_list[0][1])
-    # plt.xlabel("timestep",fontsize=12)
-    # plt.ylabel("Regret",fontsize=12)
-    # plt.title(f"n_users = {n_users}, n_actions = {n_action}")
-    # plt.legend(["previous","new"])
-    # plt.show()
 
 if __name__ == "__main__":
     main()

@@ -1,0 +1,9 @@
+defaults:
+  - _self_
+  - setting: default
+hydra:
+  run:
+    dir: ./output/${setting.run_file}/n_users=${setting.n_users},n_action=${setting.n_actions}
+  sweep:
+    dir: ./output/${setting.run_file}/n_users=${setting.n_users},n_action=${setting.n_actions}
+    subdir: ./

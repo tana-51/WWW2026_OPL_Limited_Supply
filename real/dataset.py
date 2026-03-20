@@ -26,9 +26,9 @@ class RealBanditDatasetLimittedSupply(BaseBanditDataset):
     n_users: int = 200
     n_step: int = 1001
     max_supply: int = 10
-    supply_type: str = "random"  # "random", "supply_demand_law", "inverse"
+    supply_type: str = "random"  # "random", "proportional", "inverse proportional"
     dataset_name: str = "real_bandit_dataset_with_limmited_supply"
-    
+
     def __post_init__(self):
         self.data_path = Path(r"/home/kawagi/My/OPL_with_limited_supply/real/data/kuairec")
         self.pca = PCA(n_components=self.n_components, random_state=self.random_state)
@@ -61,7 +61,7 @@ class RealBanditDatasetLimittedSupply(BaseBanditDataset):
         context = df_user_feature.to_numpy()
 
         return watch, context
-        
+
     def obtain_batch_bandit_feedback(self) -> BanditFeedback:
         """Obtain batch logged bandit data."""
         # user and contexts
@@ -73,20 +73,16 @@ class RealBanditDatasetLimittedSupply(BaseBanditDataset):
 
         # action
         action_idx = self.random_.choice(self.interactions.shape[1], size=self.n_actions, replace=False)
-        
+
         # expected reward function
         fixed_q_x_a = self.interactions[np.ix_(user_idx,action_idx)]
 
-        # noise
-        pi_b_logits = fixed_q_x_a + np.random.normal(loc=0.0, scale=3.0, size=fixed_q_x_a.shape) #scale変えてもいいかも
-        #pi_b_logits = fixed_q_x_a.copy()
-
-        # calculate the action choice probabilities of the behavior policy
-        fixed_pi_b = softmax(self.beta * pi_b_logits)
+        # pi_b_logits
+        pi_b_logits = fixed_q_x_a + np.random.normal(loc=0.0, scale=5.0, size=fixed_q_x_a.shape)
 
         # supply
         supply = obtain_supply(n_action=self.n_actions, fixed_q_x_a=fixed_q_x_a, max_supply=self.max_supply, supply_type=self.supply_type)
-        
+
         # sample actions for each round based on the behavior policy
         unique_action_set = np.arange(self.n_actions)
         user_idx_list = []
@@ -94,17 +90,21 @@ class RealBanditDatasetLimittedSupply(BaseBanditDataset):
         reward_list = []
         pscore_list = []
         supply_list = []
-        
+
         for i in range(self.n_step):
             user_idx = self.random_.randint(low=0, high=self.n_users)
+
+            # calculate the action choice probabilities of the behavior policy
             pi_b_logits_ = self.beta * pi_b_logits[user_idx, unique_action_set]
             pi_b = softmax(pi_b_logits_.reshape(1,-1))[0,:]
-            
+
+            # sample action
             action = self.random_.choice(unique_action_set, p=pi_b)
             sampled_action_index = np.where(unique_action_set == action)[0][0]
-            
+
+            # sample reward
             reward = self.sample_reward_given_expected_reward(fixed_q_x_a[user_idx,action])
-            
+
             user_idx_list.append(user_idx)
             action_list.append(action)
             reward_list.append(reward)
@@ -112,7 +112,7 @@ class RealBanditDatasetLimittedSupply(BaseBanditDataset):
             supply_list.append(supply.reshape(1,-1))
             supply[action] -= 1
 
-             # delete action
+            # delete sold out action
             unique_action_set = np.delete(
                 np.arange(self.n_actions), supply <=0,
             )
@@ -122,29 +122,23 @@ class RealBanditDatasetLimittedSupply(BaseBanditDataset):
         return dict(
             n_users=self.n_users,
             user_idx=np.array(user_idx_list),
-            user_context=fixed_user_context[np.unique(user_idx_list)],###
             n_actions=self.n_actions,
             fixed_user_context=fixed_user_context,
             context=fixed_user_context[np.array(user_idx_list)],
             action=np.array(action_list),
             reward=np.array(reward_list),
-            user_q_x_a=fixed_q_x_a[np.unique(user_idx_list)],###
             fixed_q_x_a=fixed_q_x_a,
             pi_b_logits=pi_b_logits,
             pscore=np.array(pscore_list),
             n_step= self.n_step,
             max_supply= self.max_supply,
-            supply_each_step=np.concatenate(supply_list,axis=0),
-            context_supply=np.concatenate([fixed_user_context[np.array(user_idx_list)],np.concatenate(supply_list,axis=0)],axis=1)
         )
 
     def sample_reward_given_expected_reward(
         self,
         expected_reward: np.ndarray,
-        #action: np.ndarray,
     ) -> np.ndarray:
         """Sample reward given expected rewards"""
-        #expected_reward_factual = expected_reward[np.arange(action.shape[0]), action]
         reward_min = 0
         reward_max = 1e3
         mean = expected_reward
@@ -164,22 +158,19 @@ def obtain_supply(n_action, fixed_q_x_a, supply_type, max_supply=10):
     if supply_type == "random":
         supply = np.random.randint(low=1, high=max_supply, size=n_action)
         
-    elif supply_type == "supply_demand_law":
+    elif supply_type == "proportional":
         demand = fixed_q_x_a.mean(axis=0)
         demand = np.clip(demand, 0, None)
 
         normalized_demand = demand / demand.max()
         supply = (normalized_demand * max_supply).astype(int)
         
-    elif supply_type == "inverse":
+    elif supply_type == "inverse proportional":
         demand = fixed_q_x_a.mean(axis=0)
         demand = np.clip(demand, 1e-6, None)
 
         inverse_demand = 1 / np.sqrt(demand)
         normalized_demand = inverse_demand / inverse_demand.max()
         supply = (normalized_demand * max_supply).astype(int)
-
-    else:
-        raise TypeError("Unsupported supply type or format")
 
     return supply

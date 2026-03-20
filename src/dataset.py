@@ -9,10 +9,10 @@ from sklearn.utils import check_random_state
 from sklearn.utils import check_scalar
 
 from obp.types import BanditFeedback
-from obp.utils import check_array
+# from obp.utils import check_array
 from obp.utils import sigmoid
 from obp.utils import softmax
-from obp.utils import sample_action_fast
+# from obp.utils import sample_action_fast
 from obp.dataset.base import BaseBanditDataset
 from reward_type import RewardType
 from obp.dataset import(
@@ -36,7 +36,7 @@ class SyntheticBanditDatasetLimittedSupply(BaseBanditDataset):
     beta: float = 1.0
     random_state: int = 12345
     n_users: int = 100
-    lambda_: float = 0.5 #小さいほど好みが揃う
+    lambda_: float = 0.5 
     n_step: int = 1000
     max_supply: int = 10
     supply_type: str = "random"  # "random", "supply_demand_law", "inverse"
@@ -58,9 +58,9 @@ class SyntheticBanditDatasetLimittedSupply(BaseBanditDataset):
         if self.action_context is None:
             self.action_context = np.eye(self.n_actions, dtype=int)
         else:
-            check_array(
-                array=self.action_context, name="action_context", expected_dim=2
-            )
+            # check_array(
+            #     array=self.action_context, name="action_context", expected_dim=2
+            # )
             if self.action_context.shape[0] != self.n_actions:
                 raise ValueError(
                     "Expected `action_context.shape[0] == n_actions`, but found it False."
@@ -70,8 +70,6 @@ class SyntheticBanditDatasetLimittedSupply(BaseBanditDataset):
     def obtain_batch_bandit_feedback(self, ) -> BanditFeedback:
         
         fixed_user_context = self.random_.normal(size=(self.n_users, self.dim_context))
-        # user_idx = self.random_.randint(low=0, high=self.n_users,n=n_rounds)
-        # contexts = fixed_user_context[user_idx]
 
         # obtain expected reward
         fixed_click_base = logistic_reward_function(
@@ -164,7 +162,7 @@ class SyntheticBanditDatasetLimittedSupply(BaseBanditDataset):
             fixed_conversion=fixed_conversion,
             fixed_q_x_a=fixed_q_x_a,
             pscore=np.array(pscore_list),
-            lambda_= self.lambda_, #小さいほど好みが揃う
+            lambda_= self.lambda_, 
             n_step= self.n_step,
             max_supply= self.max_supply,
             supply_each_step=np.concatenate(supply_list,axis=0),
@@ -176,8 +174,8 @@ class SyntheticBanditDatasetLimittedSupply(BaseBanditDataset):
         self, expected_reward: np.ndarray, action_dist: np.ndarray
     ) -> float:
         
-        check_array(array=expected_reward, name="expected_reward", expected_dim=2)
-        check_array(array=action_dist, name="action_dist", expected_dim=3)
+        # check_array(array=expected_reward, name="expected_reward", expected_dim=2)
+        # check_array(array=action_dist, name="action_dist", expected_dim=3)
         if expected_reward.shape[0] != action_dist.shape[0]:
             raise ValueError(
                 "Expected `expected_reward.shape[0] = action_dist.shape[0]`, but found it False"

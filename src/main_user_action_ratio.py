@@ -1,7 +1,3 @@
-"""
-user-action ratioを変化
-"""
-
 from omegaconf import DictConfig, OmegaConf
 import hydra
 import numpy as np
@@ -68,33 +64,12 @@ def main(cfg: DictConfig) -> None:
                 beta=cfg.setting.beta,
                 random_state=cfg.setting.random_state,
                 n_users=n_users,
-                lambda_=lambda_, #小さいほど好みが揃う
+                lambda_=lambda_, 
                 n_step=n_step,
                 max_supply=cfg.setting.max_supply,
                 supply_type=supply_type,
             )
 
-            # bandit_data = dataset.obtain_batch_bandit_feedback()
-
-            # if noise=="q_hat":    
-            #     reg_model = RegressionModel(
-            #         n_actions=dataset.n_actions, 
-            #         base_model=MLPRegressor(hidden_layer_sizes=(30,30,30), max_iter=3000,early_stopping=True,random_state=12345),
-            #     )
-            #     estimated_rewards = reg_model.fit(
-            #         context=bandit_data["context"], # context; x
-            #         action=bandit_data["action"], # action; a
-            #         reward=bandit_data["reward"], # reward; r
-            #     )
-            #     estimated_rewards = reg_model.predict(
-            #         context=bandit_data["fixed_user_context"], # context; x
-            #     )
-            #     q_hat = estimated_rewards[:,:,0]
-            # elif noise == "true":
-            #     q_hat = bandit_data["fixed_q_x_a"]
-            # else:
-            #     q_hat = bandit_data["fixed_q_x_a"] + np.random.normal(loc=0.0,scale=noise,size=bandit_data["fixed_q_x_a"].shape)
-            # fixed_q_x_a = bandit_data["fixed_q_x_a"]
 
             previous = np.zeros(n_step)
             new = np.zeros(n_step)
@@ -167,8 +142,6 @@ def main(cfg: DictConfig) -> None:
 
                 if ((supply_new>0).sum() >= 1) or ((supply_previous>0).sum() >= 1):
                     raise ValueError(f"supply must be above 0, but got supply_new={supply_new} and supply_previous={supply_previous}")
-                # arm_reward_previous /= n_select_arm_previous
-                # arm_reward_new /= n_select_arm_new
 
                 previous += np.array(previous_agent_revenue_list)
                 new += np.array(new_agent_revenue_list)
@@ -177,7 +150,6 @@ def main(cfg: DictConfig) -> None:
 
                 r_df = DataFrame()
                 r_df["value"] = [new_agent_revenue_list[-1] / previous_agent_revenue_list[-1]]
-                # r_df["step"] = np.arange(n_step)+1
                 r_df["ratio"] = n_users/ n_action
                 r_df["supply_type"] = supply_type
                 r_df_list.append(r_df)
@@ -187,12 +159,10 @@ def main(cfg: DictConfig) -> None:
                 
             result_list.append((new/num_runs)/(previous/num_runs))
             ax.plot((new/num_runs)/(previous/num_runs), label=f"$\lambda$={lambda_}, ratio={n_users/n_action}")
-            # plt.plot(new/num_runs, label="regret_based")
         ax.legend()
 
         ax.set_xlabel("Time Step",fontsize=12)
         ax.set_ylabel("Relative Reward (Ours/previous)",fontsize=12)
-        # plt.title(f"n_users = {n_users}, n_actions = {n_action}")
         plt.title(f"Supply Type: {supply_type}")
         ax.axhline(1.0, 0, n_step, color="black", linestyle='dashed')
         plt.savefig(f"val_lambda_{supply_type}.png")
@@ -204,13 +174,6 @@ def main(cfg: DictConfig) -> None:
             last_value.append(result_list[i][-1])
         
         last_value_list.append(last_value)
-            
-    # plt.plot(n_users_array/ n_actions, last_value, "-o")
-    # plt.xlabel("n_users / n_actions",fontsize=12)
-    # plt.ylabel("Relative Reward (Ours/previous)",fontsize=12)
-    # plt.title(f"$\lambda$ = {lambda_}, n_actions = {n_actions}")
-    # # plt.savefig("output3/user-action-ratio_vs_lastvalue.png")
-    # plt.show()
 
     df = DataFrame()
     df["n_user"] = n_users_list
@@ -227,7 +190,6 @@ def main(cfg: DictConfig) -> None:
     ax.set_xlabel("$user / action ratio$",fontsize=12)
     ax.set_ylabel("Relative Reward (Ours/previous)",fontsize=12)
     ax.legend(fontsize=15)
-    # plt.title(f"n_users = {n_users}, n_actions = {n_action}")
     plt.savefig("user_action_rartio_vs_lastvalue.png")
     plt.show()
 

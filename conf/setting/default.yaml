@@ -1,12 +1,12 @@
 run_file: main_lambda
 
 num_runs: 100
-n_step: 1000
+n_step: 2500
 n_users: 200
 dim_context: 10
 n_action: 100
 random_state: 12345
-max_supply: 10
+max_supply: 20
 reward_std: 3.0
 beta: -1.0
 
@@ -19,18 +19,38 @@ lambda_:
 heatmap:
   lambda_: 0.0
   supply_type: "random" #"supply_demand_law" "inverse"
-  n_users: 5
-  n_action: 10
-  n_step: 120
+  n_users: 3 #5
+  n_action: 5 #10
+  n_step: 150
 
 #supply_item
 supply_item:
   gamma_list: [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
-  lambda_: 0.0
+  lambda_: 0.5
   supply_type: "random"
 
 #user_action ratio
 user_action_ratio:
-  n_users_list: [5, 10,50,100,200,400,600,800,1000]
-  lambda_: 0.0
+  n_users_list: [1,2,4,8,16,32,64,128,256] 
+  lambda_: 0.5
+  supply_type_list: ["random", "supply_demand_law", "inverse"]
+  n_rounds: 50
+
+#noise
+noise:
+  noise_list: [0.0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0]
+  lambda_: 0.5
+  supply_type_list: ["random", "supply_demand_law", "inverse"]
+
+#step
+step:
+  step_list: [200, 400, 600, 800, 1000]
+  lambda_: 0.5
+  supply_type_list: ["random", "supply_demand_law", "inverse"]
+
+#s_max
+s_max:
+  s_max_list: [5, 10, 15, 20, 25, 30]
+  n_step: 1000
+  lambda_: 0.5
   supply_type_list: ["random", "supply_demand_law", "inverse"]

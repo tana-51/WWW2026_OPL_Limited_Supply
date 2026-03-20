@@ -1,0 +1,27 @@
+run_file: main_estimation_noise
+
+num_runs: 100
+n_users: 1000
+n_actions: 1000
+reward_std: 1.0
+random_state: 12345
+beta: 1.0
+max_supply: 10
+n_step: 10000
+supply_type_list: ["random","proportional","inverse proportional"]
+
+# estimation noise
+noise:
+  noise_list: ["true",0.5, 1.0, 2.0, 3.0, 4.0, 5.0,"estimate"]
+
+# n_user
+n_user:
+  n_users_list: [16,32,64,128,256,512,1024]
+  n_actions: 1000
+  noise: "estimate" # "true", "estimate", noise: int
+
+# s_max
+s_max:
+  n_step: 5000
+  s_max_list: [5,10,15,20,25,30]
+  noise_list: [true]
